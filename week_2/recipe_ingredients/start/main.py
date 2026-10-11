@@ -23,7 +23,7 @@ def get_recipe_from_text(recipe_text: str) -> Recipe:
     Convert recipe text into a structured Recipe object using Gemini via Instructor.
     """
     # Initialize the instructor client for Gemini (plug in your key)
-    client = instructor.from_provider("google/gemini-3-flash-preview", api_key = os.environ["GEMINI_API_KEY"])
+    client = instructor.from_provider("google/gemini-3-flash-preview", api_key = os.environ["YOUR_API_KEY"])
 
     # Make the API call using instructor's standardized format
     response = client.chat.completions.create(
