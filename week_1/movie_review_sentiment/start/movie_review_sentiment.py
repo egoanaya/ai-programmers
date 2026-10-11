@@ -3,7 +3,7 @@ from openai import OpenAI
 
 # Initialize the client to route to Google Gemini servers using the OpenAI library
 client = OpenAI(
-    api_key=os.environ["GEMINI_API_KEY"],
+    api_key=os.environ["YOUR_API_KEY"],
     base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
 )
 
