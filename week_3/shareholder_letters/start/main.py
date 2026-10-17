@@ -9,7 +9,7 @@ openai.api_key = os.environ.get("OPENAI_API_KEY")
 pc = Pinecone(api_key=os.environ.get("PINECONE_API_KEY"))
 
 # Constants
-INDEX_NAME = "YOUR INDEX HERE"
+INDEX_NAME = "class-documents"
 EMBEDDING_MODEL = "text-embedding-3-small"
 CHAT_MODEL = "gpt-4o-mini-2024-07-18"
 
@@ -21,7 +21,7 @@ def load_documents():
     files = glob.glob(path)
     
     for file_path in files:
-        with open(file_path, 'r') as file:
+        with open(file_path, 'r', encoding="utf-8") as file:
             content = file.read()
             documents.append({"content": content, "metadata": {"source": file_path}})
     
@@ -79,7 +79,10 @@ def embed_documents(chunks, namespace):
             vectors.append({
                 "id": f"chunk_{i+j}",
                 "values": embedding,
-                "metadata": chunk_batch[j]["metadata"]
+                "metadata": {
+                    **chunk_batch[j]["metadata"],
+                    "text": chunk_batch[j]["content"]
+                }
             })
         
         # Upsert to Pinecone
@@ -90,16 +93,26 @@ def search_documents(query, namespace, top_k=5):
     # Get query embedding
     query_embedding = get_embeddings([query])[0]
     
-    # TODO: Search Pinecone using the query_embedding
-    # Implement the search functionality using the Pinecone Index query method
-    # Documentation: https://sdk.pinecone.io/python/pinecone/grpc.html#GRPCIndex.query
-    # The query should:
-    # 1. Get a reference to the index
-    # 2. Call the query method with the appropriate parameters
-    # 3. Process the results to extract the documents
-    
-    # Placeholder for the actual implementation
+    # Connect to Pinecone index
+    index = pc.Index(INDEX_NAME)
+
+    # Search for similar document chunks
+    results = index.query(
+        vector=query_embedding,
+        top_k=top_k,
+        namespace=namespace,
+        include_metadata=True
+    )
+
+    # Extract document text and similarity scores
     docs_with_scores = []
+
+    for match in results.matches:
+        metadata = match.metadata or {}
+        text = metadata.get("text")
+
+        if text:
+            docs_with_scores.append((text, match.score))
     return docs_with_scores
 
 def ask_openai(query, documents):
@@ -140,4 +153,4 @@ if __name__ == "__main__":
     
     # Step 4: Put docs into prompt and send to OpenAI
     response = ask_openai(user_query, docs_and_scores)
-    print(response) 
+    print(response)
