@@ -23,7 +23,7 @@ def load_documents():
     for file_path in files:
         with open(file_path, 'r', encoding="utf-8") as file:
             content = file.read()
-            documents.append({"content": content, "metadata": {"source": file_path}})
+            documents.append({"content": content, "metadata": {"source": os.path.basename(file_path)}})
     
     print(f"Found {len(documents)} letters")
     return documents
