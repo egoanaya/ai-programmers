@@ -25,11 +25,12 @@ def make_call_to_llm(input):
         {"role": "user", "content": user_content}
     ]
     
-    # Call the OpenAI API
+    # Call the OpenAI API and require valid JSON output
     response = client.chat.completions.create(
         model="gpt-4o-mini-2024-07-18",
         messages=messages,
-        temperature=0
+        temperature=0,
+        response_format={"type": "json_object"}
     )
     
     # Extract the output from the response
@@ -63,3 +64,12 @@ def perform_eval(llm_result, dataset_item):
 # See https://docs.smith.langchain.com/evaluation for reference and examples
 # This should evaluate make_call_to_llm against the dataset_name using perform_eval
 # and create an experiment with the prefix "news_extraction_homework"
+
+if __name__ == "__main__":
+    results = evaluate(
+        make_call_to_llm,
+        data=dataset_name,
+        evaluators=[perform_eval],
+        experiment_prefix="news_extraction_homework",
+        max_concurrency=1
+    )
