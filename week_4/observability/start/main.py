@@ -11,11 +11,21 @@ pc = Pinecone(api_key=os.environ.get("PINECONE_API_KEY"))
 
 # LangSmith client setup
 langsmith_api_key = os.environ.get("LANGCHAIN_API_KEY")
+
+if not langsmith_api_key:
+    raise RuntimeError("LANGCHAIN_API_KEY is not configured")
+
 langsmith_project = "rag-observability"
+
+# Enable tracing and configure the project
+os.environ["LANGSMITH_API_KEY"] = langsmith_api_key
+os.environ["LANGSMITH_TRACING"] = "true"
+os.environ["LANGSMITH_PROJECT"] = langsmith_project
+
 langsmith_client = Client(api_key=langsmith_api_key)
 
 # Constants
-INDEX_NAME = "test"
+INDEX_NAME = "class-documents"
 EMBEDDING_MODEL = "text-embedding-3-small"
 CHAT_MODEL = "gpt-4o-mini-2024-07-18"
 
@@ -95,6 +105,7 @@ def embed_documents(chunks, namespace):
         # Upsert to Pinecone
         index.upsert(vectors=vectors, namespace=namespace)
 
+@traceable(name="search_documents")
 def search_documents(query, namespace, top_k=5):
     """Search the vector store with the user query."""
     # Get query embedding
@@ -112,16 +123,32 @@ def search_documents(query, namespace, top_k=5):
     
     # Get matched documents
     docs_with_scores = []
-    for match in results["matches"]:
-        # Load the document content based on the source file
-        with open(match["metadata"]["source"], 'r') as f:
-            content = f.read()
-        docs_with_scores.append((content, match["score"]))
-    
+
+    for match in results.matches:
+        metadata = match.metadata or {}
+
+        # Prefer the document chunk stored in Pinecone
+        content = metadata.get("text")
+
+        # Fall back to the local shareholder letter
+        if not content:
+            filename = os.path.basename(metadata["source"])
+            local_file = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                "letters",
+                filename
+            )
+
+            with open(local_file, "r", encoding="utf-8") as f:
+                content = f.read()
+
+        docs_with_scores.append((content, match.score))
+
     return docs_with_scores
 
 # TODO: Add traceable decorator to track this function in LangSmith
 # Example: https://docs.smith.langchain.com/observability/how_to_guides/log_traces_to_project
+@traceable(name="ask_openai")
 def ask_openai(query, documents):
     """Ask OpenAI a question with context from the documents."""
     # Join all documents into a single context string
@@ -153,4 +180,4 @@ if __name__ == "__main__":
     # Step 4: Put docs into prompt and send to OpenAI
     response = ask_openai(user_query, docs_and_scores)
         
-    print(response) 
+    print(response)
