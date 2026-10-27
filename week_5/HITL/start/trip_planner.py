@@ -48,7 +48,7 @@ class TripPlanner:
 
         try:
             response = self.client.chat.completions.create(
-                model="gpt-4",
+                model="gpt-4o-mini-2024-07-18",
                 messages=[
                     {"role": "system", "content": "You are a helpful travel assistant."},
                     {"role": "user", "content": prompt}
@@ -60,7 +60,7 @@ class TripPlanner:
             print(f"Error getting destination suggestion: {e}")
             return "Paris"  # Fallback destination
 
-    def suggest_flight(self, departure_city: str, destination: str) -> Dict:
+    def suggest_flight(self, departure_city: str, destination: str) -> FlightInfo:
         """Use LLM to suggest a fictional flight."""
         prompt = f"""Generate a fictional flight from {departure_city} to {destination}.
         Include departure time, arrival time, and flight number."""
@@ -77,14 +77,14 @@ class TripPlanner:
             return response.output_parsed
         except Exception as e:
             print(f"Error getting flight suggestion: {e}")
-            return {
-                "flight_number": "AA123",
-                "departure_time": "10:00",
-                "arrival_time": "12:00",
-                "airline": "Example Airlines"
-            }
+            return FlightInfo(
+                flight_number="AA123",
+                departure_time="10:00",
+                arrival_time="12:00",
+                airline="Example Airlines"
+            )
 
-    def generate_itinerary(self, destination: str) -> Dict:
+    def generate_itinerary(self, destination: str) -> Itinerary:
         """Use LLM to generate a brief itinerary."""
         prompt = f"""Generate a brief 3-day itinerary for {destination}.
         Include 2-3 activities per day."""
@@ -101,11 +101,13 @@ class TripPlanner:
             return response.output_parsed
         except Exception as e:
             print(f"Error generating itinerary: {e}")
-            return {
-                "day1": ["Morning activity", "Afternoon activity"],
-                "day2": ["Morning activity", "Afternoon activity"],
-                "day3": ["Morning activity", "Afternoon activity"]
-            }
+            return Itinerary(
+                daily_activities=[
+                    ["Morning activity", "Afternoon activity"],
+                    ["Morning activity", "Afternoon activity"],
+                    ["Morning activity", "Afternoon activity"]
+                ]
+            )
 
     def get_human_confirmation(self, prompt: str) -> bool:
         """Get human confirmation for a suggestion."""
@@ -142,21 +144,54 @@ class TripPlanner:
         print(f"Departure: {suggested_flight.departure_time}")
         print(f"Arrival: {suggested_flight.arrival_time}")
         
+        # Human-in-the-loop: It will confirm or modify the suggested flight
+        if self.get_human_confirmation("Would you like to use this flight?"):
+            selected_flight = suggested_flight
+        else:
+            print("\nEnter your preferred flight details:")
+            selected_flight = FlightInfo(
+                airline=input("Airline: ").strip(),
+                flight_number=input("Flight number: ").strip(),
+                departure_time=input("Departure time (HH:MM): ").strip(),
+                arrival_time=input("Arrival time (HH:MM): ").strip()
+            )
+        
         # Step 3: Itinerary Generation
         suggested_itinerary = self.generate_itinerary(destination)
         
         print("\nSuggested itinerary:")
         for index, activities in enumerate(suggested_itinerary.daily_activities, 1):
-            print(f"\nDAY {index + 1}:")
+            print(f"\nDAY {index}:")
             for activity in activities:
                 print(f"- {activity}")
+
+        # Human-in-the-loop: It will confirm or customize the itinerary
+        if self.get_human_confirmation("Would you like to use this itinerary?"):
+            selected_itinerary = suggested_itinerary
+        else:
+            print("\nCustomize your 3-day itinerary:")
+            daily_activities = []
+
+            for day in range(1, 4):
+                print(f"\nDay {day}:")
+                activities = input(
+                    "Enter activities separated by commas: "
+                ).strip().split(",")
+
+                daily_activities.append(
+                    [activity.strip() for activity in activities if activity.strip()]
+                )
+
+            selected_itinerary = Itinerary(
+                daily_activities=daily_activities
+            )
 
         # Save the complete trip plan
         self.trip_plan = TripPlan(
             destination=destination,
             departure_city=departure_city,
-            flight_info=suggested_flight,
-            itinerary=suggested_itinerary
+            flight_info=selected_flight,
+            itinerary=selected_itinerary
         )
 
         # Display final plan
@@ -164,13 +199,13 @@ class TripPlanner:
         print(f"Destination: {self.trip_plan.destination}")
         print(f"Departure from: {self.trip_plan.departure_city}")
         print("\nFlight Information:")
-        print(f"Airline: {suggested_flight.airline}")
-        print(f"Flight: {suggested_flight.flight_number}")
-        print(f"Departure: {suggested_flight.departure_time}")
-        print(f"Arrival: {suggested_flight.arrival_time}")
+        print(f"Airline: {selected_flight.airline}")
+        print(f"Flight: {selected_flight.flight_number}")
+        print(f"Departure: {selected_flight.departure_time}")
+        print(f"Arrival: {selected_flight.arrival_time}")
         print("\nItinerary:")
         for index, activities in enumerate(self.trip_plan.itinerary.daily_activities, 1):
-            print(f"\nDAY {index + 1}:")
+            print(f"\nDAY {index}:")
             for activity in activities:
                 print(f"- {activity}")
 
